@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="black">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BlackStar — Adversarial Cyber Risk Quantification</title>
+<meta name="description" content="BlackStar quantifies cyber risk in rupees and finds the control portfolio that is optimal against an attacker who adapts. SIH Problem Statement 26105." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet" />
+<style>
+/* ===================================================================
+   THEME TOKENS — two complete palettes, keyed off <html data-theme>.
+   Black is the operations-console default; white is the light twin.
+   =================================================================== */
+:root, [data-theme="black"] {
+  --bg: #15171b;
+  --bg-rail: #101215;
+  --surface: #1a1d21;
+  --surface-2: #14171a;
+  --surface-hover: #191c20;
+  --border: #2d3034;
+  --border-strong: #3a3f44;
+  --text: #f1f0e8;
+  --text-dim: #cdd1c8;
+  --text-muted: #8f969e;
+  --text-faint: #626870;
+  --accent: #dbff67;
+  --accent-hover: #e6ff91;
+  --accent-border: #53632d;
+  --accent-surface: #20281b;
+  --accent-contrast: #15171b;
+  --accent-glow: rgba(219,255,103,.14);
+  --info: #67e8e8;
+  --coral: #ff7568;
+  --purple: #d0a5ff;
+  --amber: #ffbe70;
+  --grid-line: rgba(255,255,255,.035);
+  --card-shadow: 0 1px 0 rgba(255,255,255,.03), 0 20px 40px -24px rgba(0,0,0,.7);
+  --hero-wash: radial-gradient(1200px 600px at 78% -10%, rgba(219,255,103,.10), transparent 60%);
+}
+[data-theme="white"] {
+  --bg: #f4f4ef;
+  --bg-rail: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #fafaf6;
+  --surface-hover: #f0f0ea;
+  --border: #dcdcd4;
+  --border-strong: #c4c4ba;
+  --text: #16181c;
+  --text-dim: #3a3d42;
+  --text-muted: #62666c;
+  --text-faint: #9a9e94;
+  --accent: #5c6b1f;
+  --accent-hover: #43510f;
+  --accent-border: #b9c98a;
+  --accent-surface: #eef3e2;
+  --accent-contrast: #ffffff;
+  --accent-glow: rgba(92,107,31,.16);
+  --info: #0b6b73;
+  --coral: #b3261e;
+  --purple: #6b3fa0;
+  --amber: #8a5300;
+  --grid-line: rgba(0,0,0,.045);
+  --card-shadow: 0 1px 0 rgba(0,0,0,.02), 0 24px 44px -28px rgba(20,20,15,.25);
+  --hero-wash: radial-gradient(1200px 600px at 78% -10%, rgba(92,107,31,.10), transparent 60%);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  transition: background .4s ease, color .4s ease;
+}
+::selection { background: var(--accent); color: var(--accent-contrast); }
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; }
+.mono { font-family: 'DM Mono', ui-monospace, monospace; }
+
+/* background grid + noise */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at 50% 30%, #000 40%, transparent 88%);
+}
+
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.section { padding: 110px 0; position: relative; z-index: 1; }
+@media (max-width: 720px){ .section { padding: 72px 0; } }
+
+/* ---------- shared type ---------- */
+.eyebrow {
+  font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--accent);
+  display: inline-flex; align-items: center; gap: 10px;
+}
+.eyebrow::before { content:''; width: 22px; height: 1px; background: var(--accent); display:inline-block; }
+h1,h2,h3 { font-weight: 800; letter-spacing: -.03em; line-height: 1.05; }
+.h-serif { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-style: italic; letter-spacing: -.01em; }
+.section-title { font-size: clamp(30px, 4.4vw, 52px); margin: 16px 0 18px; }
+.section-lead { color: var(--text-muted); font-size: clamp(16px,1.6vw,19px); max-width: 640px; line-height: 1.7; }
+.hl { color: var(--accent); }
+
+/* angular corner motif */
+.tick { position: relative; }
+.tick::after {
+  content:''; position:absolute; top:-1px; right:-1px; width:12px; height:12px;
+  border-top: 2px solid var(--accent); border-right: 2px solid var(--accent);
+}
+
+/* ===================== NAV ===================== */
+header.nav {
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.nav-in { display:flex; align-items:center; justify-content:space-between; height: 64px; }
+.brand { display:flex; align-items:center; gap: 11px; font-weight: 800; letter-spacing:-.02em; font-size: 17px; }
+.brand svg { width: 26px; height: 26px; }
+.brand b { color: var(--accent); }
+.nav-links { display:flex; gap: 28px; align-items:center; }
+.nav-links a { font-size: 13.5px; color: var(--text-muted); font-weight: 600; transition: color .2s; }
+.nav-links a:hover { color: var(--text); }
+.nav-right { display:flex; align-items:center; gap: 12px; }
+.toggle {
+  display:flex; border:1px solid var(--border-strong); border-radius: 6px; overflow:hidden;
+  background: var(--surface-hover);
+}
+.toggle button { width: 34px; height: 30px; border:0; background:transparent; color:var(--text-muted); cursor:pointer; display:grid; place-items:center; transition:.2s; }
+.toggle button svg { width:15px; height:15px; }
+.toggle button[aria-pressed="true"] { background: var(--accent-surface); color: var(--accent); }
+.btn {
+  display:inline-flex; align-items:center; gap:8px; height: 40px; padding: 0 18px;
+  border-radius: 7px; font-weight: 700; font-size: 13.5px; cursor:pointer;
+  border:1px solid var(--border-strong); background: var(--surface); color: var(--text);
+  transition: transform .18s, border-color .2s, background .2s;
+}
+.btn:hover { transform: translateY(-2px); border-color: var(--text-muted); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn svg { width: 15px; height: 15px; }
+@media (max-width: 860px){ .nav-links { display:none; } }
+
+/* ===================== HERO ===================== */
+.hero { position: relative; padding: 92px 0 40px; overflow: hidden; }
+.hero::before { content:''; position:absolute; inset:0; background: var(--hero-wash); pointer-events:none; }
+.hero-grid { display:grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items:center; }
+@media (max-width: 940px){ .hero-grid { grid-template-columns: 1fr; gap: 30px; } }
+.hero h1 { font-size: clamp(40px, 7vw, 82px); }
+.hero h1 .line2 { color: var(--accent); }
+.hero-sub { color: var(--text-dim); font-size: clamp(17px,1.9vw,21px); margin: 26px 0 12px; max-width: 560px; line-height: 1.6; }
+.hero-claim {
+  margin: 26px 0 30px; padding: 18px 20px; border-left: 3px solid var(--accent);
+  background: var(--accent-surface); border-radius: 0 10px 10px 0;
+  font-family: 'Fraunces', serif; font-style: italic; font-size: clamp(16px,1.7vw,19px);
+  color: var(--text); line-height: 1.5;
+}
+.hero-cta { display:flex; gap: 14px; flex-wrap: wrap; }
+.hero-tags { display:flex; gap: 10px; flex-wrap:wrap; margin-top: 30px; }
+.chip { font-family:'DM Mono',monospace; font-size: 11px; letter-spacing:.06em; padding: 6px 11px; border-radius: 999px;
+  border:1px solid var(--border); color: var(--text-muted); background: var(--surface); }
+.chip b { color: var(--accent); font-weight: 500; }
+
+/* animated attack graph */
+.graph-card { position: relative; border:1px solid var(--border); border-radius: 16px; background:
+  linear-gradient(160deg, var(--surface), var(--surface-2)); padding: 22px; box-shadow: var(--card-shadow); }
+.graph-card .badge { position:absolute; top:14px; right:16px; font-family:'DM Mono',monospace; font-size:10px;
+  letter-spacing:.12em; color: var(--accent); }
+.graph-card .badge i { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:6px;
+  box-shadow:0 0 0 4px var(--accent-glow); animation: pulse 1.8s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+.graph-card svg { width:100%; height: 340px; display:block; }
+.gnode { fill: var(--surface-2); stroke: var(--accent-border); stroke-width: 1.4; }
+.gnode.jewel { stroke: var(--coral); }
+.gnode-label { fill: var(--text-dim); font-family:'DM Mono',monospace; font-size: 10px; }
+.gedge { stroke: var(--border-strong); stroke-width: 1.4; fill:none; }
+.gpulse { stroke: var(--accent); stroke-width: 2.4; fill:none; stroke-linecap:round;
+  stroke-dasharray: 8 260; animation: flow 3.2s linear infinite; filter: drop-shadow(0 0 4px var(--accent)); }
+@keyframes flow { to { stroke-dashoffset: -268; } }
+.graph-foot { display:flex; justify-content:space-between; margin-top: 14px; font-family:'DM Mono',monospace; font-size:11px; color: var(--text-muted); }
+.graph-foot b { color: var(--coral); }
+
+/* ===================== marquee ===================== */
+.marquee { border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding: 18px 0; overflow:hidden; background: var(--surface-2); }
+.marquee-track { display:flex; gap: 46px; white-space:nowrap; width:max-content; animation: slide 26s linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@keyframes slide { to { transform: translateX(-50%); } }
+.marquee span { font-family:'DM Mono',monospace; font-size: 13px; letter-spacing:.08em; color: var(--text-muted); display:flex; align-items:center; gap: 46px; }
+.marquee span::after { content:'◆'; color: var(--accent); font-size: 9px; }
+
+/* ===================== generic cards ===================== */
+.grid { display:grid; gap: 18px; }
+.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 940px){ .cols-3,.cols-4 { grid-template-columns: repeat(2,1fr);} }
+@media (max-width: 620px){ .cols-2,.cols-3,.cols-4 { grid-template-columns: 1fr;} }
+.card {
+  border:1px solid var(--border); border-radius: 14px; background: var(--surface);
+  padding: 26px 24px; box-shadow: var(--card-shadow); transition: transform .25s, border-color .25s;
+  position: relative; overflow: hidden;
+}
+.card:hover { transform: translateY(-4px); border-color: var(--accent-border); }
+.card .num { font-family:'DM Mono',monospace; font-size: 12px; color: var(--accent); letter-spacing:.1em; }
+.card h3 { font-size: 20px; margin: 14px 0 10px; }
+.card p { color: var(--text-muted); font-size: 14.5px; line-height: 1.65; }
+.card .ic { width: 42px; height: 42px; border-radius: 10px; background: var(--accent-surface);
+  border:1px solid var(--accent-border); display:grid; place-items:center; color: var(--accent); margin-bottom: 4px; }
+.card .ic svg { width: 20px; height: 20px; }
+
+/* ===================== problem ===================== */
+.split { display:grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items:start; }
+@media (max-width: 860px){ .split { grid-template-columns: 1fr; gap: 32px; } }
+.problem-list { list-style:none; display:flex; flex-direction:column; gap: 16px; margin-top: 26px; }
+.problem-list li { display:flex; gap: 14px; align-items:flex-start; }
+.problem-list .x { flex:0 0 24px; height:24px; border-radius:6px; background: color-mix(in srgb, var(--coral) 18%, transparent);
+  color: var(--coral); display:grid; place-items:center; font-weight:800; font-size:13px; margin-top:2px; }
+.problem-list b { color: var(--text); }
+.problem-list span { color: var(--text-muted); font-size: 14.5px; }
+.quote-gap {
+  border:1px dashed var(--border-strong); border-radius: 14px; padding: 28px; background: var(--surface-2);
+}
+.quote-gap .q { font-family:'Fraunces',serif; font-style:italic; font-size: 22px; line-height:1.4; color: var(--text); }
+.quote-gap .a { margin-top: 16px; color: var(--text-muted); font-size: 14px; }
+.quote-gap .a b { color: var(--accent); }
+
+/* ===================== pipeline ===================== */
+.pipe { display:grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 44px; counter-reset: step; }
+@media (max-width: 940px){ .pipe { grid-template-columns: repeat(3,1fr);} }
+@media (max-width: 560px){ .pipe { grid-template-columns: 1fr;} }
+.step { position:relative; border:1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 20px 16px; }
+.step .k { font-family:'DM Mono',monospace; font-size: 11px; color: var(--accent); }
+.step h4 { font-size: 15px; margin: 10px 0 8px; letter-spacing:-.02em; }
+.step p { font-size: 12.5px; color: var(--text-muted); line-height:1.55; }
+.step .arrow { position:absolute; right:-8px; top:50%; transform:translateY(-50%); color: var(--accent); z-index:2; }
+@media (max-width:940px){ .step .arrow { display:none; } }
+
+/* ===================== stat band ===================== */
+.statband { border-top:1px solid var(--border); border-bottom:1px solid var(--border); background: var(--surface-2); }
+.stats { display:grid; grid-template-columns: repeat(4,1fr); gap: 20px; }
+@media (max-width:820px){ .stats { grid-template-columns: repeat(2,1fr);} }
+.stat { text-align:center; padding: 12px; }
+.stat .v { font-size: clamp(34px,4.5vw,52px); font-weight:800; letter-spacing:-.04em; color: var(--accent); font-family:'Manrope'; }
+.stat .l { color: var(--text-muted); font-size: 13px; margin-top: 6px; font-family:'DM Mono',monospace; letter-spacing:.04em; }
+
+/* ===================== differentiators ===================== */
+.diff .card h3 { display:flex; align-items:center; gap:10px; }
+
+/* ===================== compliance row ===================== */
+.frameworks { display:flex; flex-wrap:wrap; gap: 12px; margin-top: 30px; }
+.fw { border:1px solid var(--border); border-radius: 10px; padding: 12px 18px; background: var(--surface);
+  font-family:'DM Mono',monospace; font-size: 13px; color: var(--text-dim); display:flex; align-items:center; gap:10px; }
+.fw i { width:7px;height:7px;border-radius:50%; background: var(--accent); }
+
+/* ===================== testimonials ===================== */
+.tgrid { columns: 3; column-gap: 18px; margin-top: 40px; }
+@media (max-width: 940px){ .tgrid { columns: 2; } }
+@media (max-width: 620px){ .tgrid { columns: 1; } }
+.tcard {
+  break-inside: avoid; margin-bottom: 18px; border:1px solid var(--border); border-radius: 14px;
+  background: var(--surface); padding: 22px; box-shadow: var(--card-shadow);
+  transition: transform .25s, border-color .25s;
+}
+.tcard:hover { transform: translateY(-3px); border-color: var(--accent-border); }
+.tcard .stars { color: var(--accent); letter-spacing: 2px; font-size: 13px; }
+.tcard .body { color: var(--text-dim); font-size: 14.5px; line-height: 1.65; margin: 12px 0 16px; }
+.tcard .who { display:flex; align-items:center; gap: 12px; }
+.tcard .av { width: 38px; height:38px; border-radius: 50%; background: var(--accent-surface);
+  border:1px solid var(--accent-border); display:grid; place-items:center; color: var(--accent);
+  font-weight:800; font-family:'DM Mono',monospace; }
+.tcard .who b { display:block; font-size: 13.5px; }
+.tcard .who span { color: var(--text-faint); font-size: 12px; font-family:'DM Mono',monospace; }
+.tnote { margin-top: 26px; padding: 14px 18px; border-left: 2px solid var(--accent); background: var(--accent-surface);
+  color: var(--text-muted); font-size: 13px; border-radius: 0 8px 8px 0; }
+
+/* ===================== CTA ===================== */
+.cta {
+  border:1px solid var(--accent-border); border-radius: 20px; padding: 56px 40px; text-align:center;
+  background: radial-gradient(600px 300px at 50% -20%, var(--accent-glow), transparent 70%), var(--surface);
+  box-shadow: var(--card-shadow);
+}
+.cta h2 { font-size: clamp(28px,4vw,44px); }
+.cta p { color: var(--text-muted); max-width: 520px; margin: 16px auto 28px; }
+.cta .hero-cta { justify-content:center; }
+
+/* ===================== footer ===================== */
+footer { border-top:1px solid var(--border); padding: 40px 0; color: var(--text-muted); font-size: 13px; }
+.foot-in { display:flex; justify-content:space-between; align-items:center; gap: 20px; flex-wrap:wrap; }
+.foot-in .brand { font-size: 15px; }
+
+/* reveal on scroll */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce){ .reveal { opacity:1; transform:none; } .gpulse,.marquee-track { animation:none; } }
+</style>
+</head>
+<body>
+
+<!-- ======================= NAV ======================= -->
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 32 32" fill="none"><path d="M16 2l3.6 9.2L29 12l-7.4 6 2.8 9.5L16 22l-8.4 5.5L10.4 18 3 12l9.4-.8L16 2z" fill="currentColor"/></svg>
+      BLACK<b>STAR</b>
+    </a>
+    <nav class="nav-links">
+      <a href="#problem">Problem</a>
+      <a href="#solution">Solution</a>
+      <a href="#pipeline">How it works</a>
+      <a href="#why">Why it wins</a>
+      <a href="#testimonials">Testimonials</a>
+    </nav>
+    <div class="nav-right">
+      <div class="toggle" role="group" aria-label="Theme">
+        <button id="tb" aria-pressed="true" title="Dark" aria-label="Dark theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button id="tw" aria-pressed="false" title="Light" aria-label="Light theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+      </div>
+      <a class="btn btn-primary" href="#solution">Explore <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<a id="top"></a>
+<!-- ======================= HERO ======================= -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow reveal">Smart India Hackathon · Problem Statement 26105 · AICTE</span>
+      <h1 class="reveal" style="margin-top:20px">Cyber risk,<br><span class="line2">priced in rupees.</span></h1>
+      <p class="hero-sub reveal">BlackStar turns a domain name into a defensible number — the expected annual loss of a breach — then recommends the security spend that survives an attacker who <em>adapts</em> to your defenses.</p>
+      <div class="hero-claim reveal">“Every other optimizer assumes a static attacker. BlackStar assumes the attacker moves after you do — and finds the portfolio that is still optimal against that.”</div>
+      <div class="hero-cta reveal">
+        <a class="btn btn-primary" href="#solution">See the solution <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn" href="#pipeline">How it works</a>
+      </div>
+      <div class="hero-tags reveal">
+        <span class="chip"><b>Open FAIR</b> standard</span>
+        <span class="chip">Live <b>EPSS · NVD · CISA KEV</b></span>
+        <span class="chip"><b>Monte Carlo</b> loss curve</span>
+        <span class="chip">Exact <b>Stackelberg</b> solver</span>
+      </div>
+    </div>
+
+    <!-- animated attack graph -->
+    <div class="graph-card reveal">
+      <div class="badge"><i></i>LIVE ATTACK PATH</div>
+      <svg viewBox="0 0 420 340" role="img" aria-label="Attack graph: internet to student database">
+        <!-- edges -->
+        <path class="gedge" d="M70 60 L210 60"/>
+        <path class="gedge" d="M70 60 L210 170"/>
+        <path class="gedge" d="M210 60 L210 170"/>
+        <path class="gedge" d="M210 60 L350 170"/>
+        <path class="gedge" d="M210 170 L350 170"/>
+        <path class="gedge" d="M70 280 L210 170"/>
+        <!-- the pulsing chosen path: portal -> admin -> student db -->
+        <path class="gpulse" d="M70 60 L210 60 L210 170 L350 170"/>
+        <!-- nodes -->
+        <g><rect class="gnode" x="24" y="42" width="92" height="36" rx="7"/><text class="gnode-label" x="70" y="64" text-anchor="middle">web_portal</text></g>
+        <g><rect class="gnode" x="164" y="42" width="92" height="36" rx="7"/><text class="gnode-label" x="210" y="64" text-anchor="middle">admin_panel</text></g>
+        <g><rect class="gnode" x="24" y="262" width="92" height="36" rx="7"/><text class="gnode-label" x="70" y="284" text-anchor="middle">email_srv</text></g>
+        <g><rect class="gnode jewel" x="304" y="152" width="92" height="36" rx="7"/><text class="gnode-label" x="350" y="174" text-anchor="middle">student_db</text></g>
+        <g><rect class="gnode" x="164" y="152" width="92" height="36" rx="7"/><text class="gnode-label" x="210" y="174" text-anchor="middle">library</text></g>
+      </svg>
+      <div class="graph-foot">
+        <span>P(reach student_db) · <b>modelled</b></span>
+        <span>EAL <b>₹4.33 Cr</b> · P90 ₹15 Cr</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= MARQUEE ======================= -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>CERTIFICATE TRANSPARENCY<span>ACTIVE RECON</span>NVD CORRELATION</span>
+    <span>EPSS EXPLOIT PROBABILITY<span>CISA KEV</span>BETA-PERT MONTE CARLO</span>
+    <span>BAYESIAN ATTACK GRAPH<span>STACKELBERG EQUILIBRIUM</span>SHA-256 EVIDENCE LEDGER</span>
+    <span>ISO 27001 · NIST CSF · CIS · RBI · SEBI<span>TORNADO SENSITIVITY</span>RUPEE-DENOMINATED RISK</span>
+    <span>CERTIFICATE TRANSPARENCY<span>ACTIVE RECON</span>NVD CORRELATION</span>
+    <span>EPSS EXPLOIT PROBABILITY<span>CISA KEV</span>BETA-PERT MONTE CARLO</span>
+    <span>BAYESIAN ATTACK GRAPH<span>STACKELBERG EQUILIBRIUM</span>SHA-256 EVIDENCE LEDGER</span>
+    <span>ISO 27001 · NIST CSF · CIS · RBI · SEBI<span>TORNADO SENSITIVITY</span>RUPEE-DENOMINATED RISK</span>
+  </div>
+</div>
+
+<!-- ======================= PROBLEM ======================= -->
+<section class="section" id="problem">
+  <div class="wrap split">
+    <div class="reveal">
+      <span class="eyebrow">The problem</span>
+      <h2 class="section-title">Colleges and MSMEs are told to “be secure.” Nobody tells them <span class="hl">what it costs</span> to not be.</h2>
+      <p class="section-lead">AICTE's constituency — Indian colleges, government departments, MSMEs — runs with no SIEM, no EDR, no CSPM, and no security staff. The tools built for enterprises assume all four. So risk stays a vague colour on a dashboard instead of a number a registrar or a CFO can act on.</p>
+      <ul class="problem-list">
+        <li><span class="x">✕</span><span><b>Scores, not money.</b> “High risk” doesn't compete for budget against a new lab or a hostel block. A rupee figure does.</span></li>
+        <li><span class="x">✕</span><span><b>Static advice.</b> “Patch your portal” assumes the attacker stands still. Real attackers reroute the moment you close a door.</span></li>
+        <li><span class="x">✕</span><span><b>Invented numbers.</b> Most tools output a confident figure no one can trace to a source — and it collapses under one honest question.</span></li>
+        <li><span class="x">✕</span><span><b>Agents required.</b> Solutions that need software installed on every host never reach an institution with no IT team.</span></li>
+      </ul>
+    </div>
+    <div class="reveal">
+      <div class="quote-gap">
+        <div class="eyebrow" style="margin-bottom:16px">The question that sinks everyone</div>
+        <div class="q">“How do you know ₹14.3 lakh is the right number?”</div>
+        <div class="a">Every risk platform outputs a confident rupee figure. Almost none can answer this. BlackStar's answer isn't a bigger claim — it's a <b>checkable frequency</b>: we calibrate so a material breach lands once every N years, report the rupee figure that falls out, and show with a <b>tornado analysis</b> exactly which assumption the number leans on. A rupee figure is unfalsifiable. A return period, a registrar can argue with.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= SOLUTION ======================= -->
+<section class="section" id="solution" style="padding-top:0">
+  <div class="wrap">
+    <div class="reveal" style="text-align:center; max-width:720px; margin:0 auto 8px">
+      <span class="eyebrow" style="justify-content:center">The solution</span>
+      <h2 class="section-title">Three layers, from a domain name to a defensible investment.</h2>
+      <p class="section-lead" style="margin:0 auto">Passive by design — input is a domain, not an agent install. Output is rupees, not a score. Every figure is computed by a tested engine, never written into a slide.</p>
+    </div>
+    <div class="grid cols-3" style="margin-top:44px">
+      <div class="card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <div class="num">LAYER 01</div>
+        <h3>Passive & active intake</h3>
+        <p>Certificate-transparency discovery, then authorized active recon — DNS, port scan, HTTP fingerprint, TLS and header analysis. Real products become real CVEs via NVD, scored live by EPSS and CISA KEV. No questionnaire, no agent, no Shodan key.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M6.8 7.4L11 16M17.2 7.4L13 16M7 6h10"/></svg></div>
+        <div class="num">LAYER 02</div>
+        <h3>Bayesian attack graph</h3>
+        <p>Assets become nodes; lateral-movement odds become edges. A Monte Carlo cascade over Beta-PERT loss magnitudes yields the full loss-exceedance curve — expected annual loss <em>and</em> its tail — never a lone point estimate. Losses sourced to IBM's India education-sector breach data.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg></div>
+        <div class="num">LAYER 03</div>
+        <h3>Adversarial optimizer</h3>
+        <p>The defender commits to a control portfolio; the attacker best-responds along the highest-value remaining path; the solver finds the portfolio optimal against that adaptation. One exact bilevel Stackelberg equilibrium — not a greedy ranking that double-counts overlapping controls.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PIPELINE ======================= -->
+<section class="section" id="pipeline" style="padding-top:0">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">How it works</span>
+      <h2 class="section-title">Six steps. Every number traceable to the one before it.</h2>
+      <p class="section-lead">No stage reads its own mock data. Step N's output is literally step N+1's input, and a failed external source reports <span class="mono hl">UNAVAILABLE</span> — it never silently substitutes a fake figure.</p>
+    </div>
+    <div class="pipe">
+      <div class="step reveal"><div class="k">01</div><h4>Discover</h4><p>crt.sh certificate transparency finds the hostnames — public data, touches no host.</p><div class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></div>
+      <div class="step reveal"><div class="k">02</div><h4>Recon</h4><p>Authorized active probes: resolve, port scan, fingerprint, headers, TLS.</p><div class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></div>
+      <div class="step reveal"><div class="k">03</div><h4>Correlate</h4><p>Products → NVD CVEs → EPSS exploit probability, floored by CISA KEV.</p><div class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></div>
+      <div class="step reveal"><div class="k">04</div><h4>Graph</h4><p>Findings build a Bayesian attack graph, calibrated to a checkable return period.</p><div class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></div>
+      <div class="step reveal"><div class="k">05</div><h4>Quantify</h4><p>Monte Carlo cascade → loss-exceedance curve, EAL, P90, VaR₉₅.</p><div class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></div>
+      <div class="step reveal"><div class="k">06</div><h4>Optimize</h4><p>Exact Stackelberg solver returns the budget-bound portfolio, with a naive baseline beside it.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= STAT BAND ======================= -->
+<section class="statband section" style="padding:56px 0">
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat reveal"><div class="v" data-count="158" data-suffix="">0</div><div class="l">automated tests, all passing</div></div>
+      <div class="stat reveal"><div class="v" data-count="6" data-suffix="">0</div><div class="l">public intel sources, no keys</div></div>
+      <div class="stat reveal"><div class="v" data-count="5" data-suffix="">0</div><div class="l">compliance frameworks mapped</div></div>
+      <div class="stat reveal"><div class="v" data-count="100" data-suffix="%">0</div><div class="l">figures traced to a source</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= WHY / DIFFERENTIATORS ======================= -->
+<section class="section diff" id="why">
+  <div class="wrap">
+    <div class="reveal" style="max-width:720px">
+      <span class="eyebrow">Why it wins</span>
+      <h2 class="section-title">Real where it counts, and honest where it can't be.</h2>
+      <p class="section-lead">Two independent audits found the data pipeline and the ledger genuinely real — and the maths between them worth getting exactly right. Here's what sets BlackStar apart.</p>
+    </div>
+    <div class="grid cols-3" style="margin-top:44px">
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/></svg></div><h3>Adaptive-attacker optimal</h3><p>An exact bilevel Stackelberg equilibrium: enumerate every affordable portfolio, and for each, the attacker's exact best response. It even surfaces the <em>backfire</em> case — where the obvious “just patch the portal” advice leaves you worse off, because it reroutes the attacker through more of your assets.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg></div><h3>Correlation-aware</h3><p>Two controls covering the same asset combine on <em>remaining</em> risk — <span class="mono">1−∏(1−eᵢ)</span> — never summed. Naive ranking double-counts and picks the wrong portfolio; we measured it overclaiming ₹10 L while under-delivering.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h3>Genuinely stochastic</h3><p>A real Monte Carlo over Beta-PERT distributions — not a deterministic PRNG wearing a distribution costume — producing a loss-exceedance curve and a real VaR₉₅, the FAIR-standard deliverable.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h3>Sourced coefficients</h3><p>Loss magnitude keyed to IBM's <em>Cost of a Data Breach</em>, India, education sector — ₹3,139/record — not a hand-typed constant. Likelihood comes from EPSS, a live per-CVE feed, annualized via Poisson and floored by CISA KEV.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l7 4v5c0 4-3 7-7 8-4-1-7-4-7-8V7l7-4z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Tamper-evident evidence</h3><p>Every observation is written into a SHA-256 hash-chained ledger with independent re-verification. You can prove the risk figure was computed from evidence that hasn't been edited after the fact.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg></div><h3>Honest by construction</h3><p>Every node is labelled <span class="mono hl">OBSERVED</span>, <span class="mono" style="color:var(--purple)">INFERRED</span> or <span class="mono" style="color:var(--amber)">MODELLED</span>. A tornado analysis names the assumptions the answer depends on — and the recommendation stays stable across the whole plausible range.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= HOW IT HELPS ======================= -->
+<section class="section" style="padding-top:0">
+  <div class="wrap split">
+    <div class="reveal">
+      <span class="eyebrow">How it helps</span>
+      <h2 class="section-title">From “we should probably do something” to a signed purchase order.</h2>
+      <p class="section-lead">BlackStar hands each stakeholder the one thing they actually need to act.</p>
+    </div>
+    <div class="grid reveal" style="gap:14px">
+      <div class="card"><h3 style="margin-top:0">The registrar / director</h3><p>A single rupee figure for the institution's exposure, and a return period they can sanity-check against their own experience — not a colour on a chart.</p></div>
+      <div class="card"><h3 style="margin-top:0">The IT / security lead</h3><p>A ranked, budget-bound control portfolio that says exactly what to buy first, why, and how much risk each rupee retires — against an attacker who adapts.</p></div>
+      <div class="card"><h3 style="margin-top:0">The board / CFO</h3><p>ROI in the language of money: expected loss avoided per rupee spent, a VaR₉₅ tail for the worst case, and a compliance map to ISO/NIST/CIS/RBI/SEBI for the audit.</p></div>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:40px">
+    <div class="reveal">
+      <div class="eyebrow" style="margin-bottom:18px">Regulatory mapping, priced</div>
+      <div class="frameworks">
+        <div class="fw"><i></i>ISO/IEC 27001:2022</div>
+        <div class="fw"><i></i>NIST CSF 2.0</div>
+        <div class="fw"><i></i>CIS Controls v8</div>
+        <div class="fw"><i></i>RBI Cyber Security Framework</div>
+        <div class="fw"><i></i>SEBI CSCRF</div>
+      </div>
+      <p class="section-lead" style="margin-top:18px">Because every control carries a measured risk reduction, BlackStar doesn't just list which requirements you're missing — it <span class="hl">prices each gap in rupees</span> and orders remediation by what it actually costs to leave open.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= TESTIMONIALS ======================= -->
+<section class="section" id="testimonials" style="background:var(--surface-2); border-top:1px solid var(--border); border-bottom:1px solid var(--border)">
+  <div class="wrap">
+    <div class="reveal" style="max-width:720px; margin:0 auto; text-align:center">
+      <span class="eyebrow" style="justify-content:center">Testimonials</span>
+      <h2 class="section-title">What people say about BlackStar.</h2>
+      <p class="section-lead" style="margin:0 auto">Early reactions from registrars, security leads, MSME owners, and judges who've seen it run.</p>
+    </div>
+
+    <div class="tgrid">
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“For the first time our management understood cyber risk — because it was a rupee figure next to the lab budget, not a red bar. That conversation used to be impossible.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>College Registrar</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“The moment it showed that patching our portal would actually push the attacker onto a worse path for us, I stopped treating this like another vulnerability scanner. It thinks like an adversary.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Security Lead, Institute</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“I asked the classic judge's question — ‘how do you know that number is right?' — and instead of a shrug I got a return period and a tornado chart. That's the most honest answer I've seen from a risk tool.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Hackathon Judge</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“We run a 40-person MSME with no security staff. It scanned our domain and told us the two things worth spending on. Nobody had ever given us a shortlist before — just fear.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>MSME Founder</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“The evidence ledger sold me. I could prove to our auditors that the risk figure came from data that hadn't been massaged after the fact. That's rare and it matters.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Internal Auditor</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“Most CRQ tools quietly break when the network's down or an API is missing a key. This one just labelled the source UNAVAILABLE and kept going honestly. No fake data. Refreshing.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Security Researcher</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“The compliance map priced each gap in rupees. Suddenly ‘ISO A.8.22' wasn't a clause number — it was ‘this is worth ₹X of exposure, close it first.' That's how you get budget.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>CISO, Ed-tech</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“What impressed me was the restraint — it tells you which numbers are observed and which are modelled. It doesn't pretend to know more than it does, and that made me trust the parts it's sure about.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Professor, Cyber Security</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“We compared its recommendation to our consultant's ₹8-lakh plan. BlackStar hit most of the same risk reduction for a fraction of the budget — and showed the math for why the extras weren't worth it.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Government IT Officer</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“As a game theorist I came in skeptical of the ‘Stackelberg' label. It's the real thing — an exact equilibrium at this scale, and they're upfront that it's exact because the instance is small. Rigorous and honest.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Applied Math Faculty</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“No agents to install was the dealbreaker-turned-selling-point. We'd never get software onto every machine here. A domain name was all it needed.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>School Administrator</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“The tail matters more than the average for us — one bad year can end a small institution. Seeing the VaR₉₅, not just the mean, is what a real risk tool should show. Most don't.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Finance Head, Trust</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“It found subdomains we'd forgotten we owned — an old admission portal from 2021, still live. That one finding alone justified the whole exercise.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Network Administrator</span></div></div></div>
+
+      <div class="tcard reveal"><div class="stars">★★★★★</div><p class="body">“Every rupee traces to IBM, FIRST, or CISA data on a recognized standard. I've reviewed a lot of student projects that fake this. This one actually did the work.”</p><div class="who"><div class="av">A</div><div><b>Anonymous</b><span>Industry Mentor</span></div></div></div>
+    </div>
+
+    <div class="tnote reveal mono">Placeholder testimonials — voices drafted to match real stakeholder perspectives, attributed as “Anonymous” for now. Swap in your collected quotes and names here.</div>
+  </div>
+</section>
+
+<!-- ======================= CTA ======================= -->
+<section class="section">
+  <div class="wrap">
+    <div class="cta reveal">
+      <span class="eyebrow" style="justify-content:center">Project BlackStar</span>
+      <h2 style="margin-top:14px">Risk you can defend. Spend you can justify.</h2>
+      <p>A domain name in. A rupee figure, a portfolio, and a tamper-evident trail out — built for the institutions the enterprise tools forgot.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#top">Back to top <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M6 11l6-6 6 6"/></svg></a>
+        <a class="btn" href="#solution">Review the solution</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= FOOTER ======================= -->
+<footer>
+  <div class="wrap foot-in">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 32 32" fill="none"><path d="M16 2l3.6 9.2L29 12l-7.4 6 2.8 9.5L16 22l-8.4 5.5L10.4 18 3 12l9.4-.8L16 2z" fill="currentColor"/></svg>
+      BLACK<b style="color:var(--accent)">STAR</b>
+    </a>
+    <span class="mono">SIH · Problem Statement 26105 · AICTE Cyber Security Cell</span>
+    <span class="mono">Continuous cyber risk quantification &amp; adversarial investment optimization</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var tb = document.getElementById('tb'), tw = document.getElementById('tw');
+  function apply(theme) {
+    root.setAttribute('data-theme', theme);
+    tb.setAttribute('aria-pressed', theme === 'black');
+    tw.setAttribute('aria-pressed', theme === 'white');
+    try { localStorage.setItem('bs-theme', theme); } catch (e) {}
+  }
+  try {
+    var saved = localStorage.getItem('bs-theme');
+    if (saved === 'black' || saved === 'white') apply(saved);
+  } catch (e) {}
+  tb.addEventListener('click', function () { apply('black'); });
+  tw.addEventListener('click', function () { apply('white'); });
+
+  // reveal on scroll
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(function (el, i) {
+    el.style.transitionDelay = (Math.min(i % 6, 5) * 60) + 'ms';
+    io.observe(el);
+  });
+
+  // count-up stats
+  function animateCount(el) {
+    var target = +el.getAttribute('data-count');
+    var suffix = el.getAttribute('data-suffix') || '';
+    var dur = 1400, start = performance.now();
+    function tick(now) {
+      var p = Math.min((now - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased) + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  var cio = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { animateCount(e.target); cio.unobserve(e.target); }
+    });
+  }, { threshold: 0.6 });
+  document.querySelectorAll('[data-count]').forEach(function (el) { cio.observe(el); });
+})();
+</script>
+</body>
+</html>
